@@ -30,12 +30,21 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
-  // Mobile / KDE Connect
+  // Mobile Bridge (standalone — no KDE Connect)
   mobile: {
-    getStatus: (deviceId) => ipcRenderer.invoke('mobile:get-status', deviceId),
-    ring: (deviceId) => ipcRenderer.invoke('mobile:ring', deviceId),
-    sendFile: (opts) => ipcRenderer.invoke('mobile:send-file', opts),
-    listDevices: () => ipcRenderer.invoke('mobile:list-devices'),
+    getStatus:     ()      => ipcRenderer.invoke('mobile:get-status'),
+    ring:          ()      => ipcRenderer.invoke('mobile:ring'),
+    sendFile:      (opts)  => ipcRenderer.invoke('mobile:send-file', opts),
+    listDevices:   ()      => ipcRenderer.invoke('mobile:list-devices'),
+    getQR:         ()      => ipcRenderer.invoke('mobile:get-qr'),
+    getServerInfo: ()      => ipcRenderer.invoke('mobile:get-server-info'),
+    sendCommand:   (cmd)   => ipcRenderer.invoke('mobile:send-command', cmd),
+    onConnected:    (cb) => { ipcRenderer.on('mobile:connected',     (_e, d) => cb(d)); return () => ipcRenderer.removeAllListeners('mobile:connected') },
+    onDisconnected: (cb) => { ipcRenderer.on('mobile:disconnected',  ()      => cb());  return () => ipcRenderer.removeAllListeners('mobile:disconnected') },
+    onStatus:       (cb) => { ipcRenderer.on('mobile:status-update', (_e, d) => cb(d)); return () => ipcRenderer.removeAllListeners('mobile:status-update') },
+    onSmsSync:      (cb) => { ipcRenderer.on('mobile:sms-sync',      (_e, d) => cb(d)); return () => ipcRenderer.removeAllListeners('mobile:sms-sync') },
+    onFileReceived: (cb) => { ipcRenderer.on('mobile:file-received', (_e, d) => cb(d)); return () => ipcRenderer.removeAllListeners('mobile:file-received') },
+    onNotification: (cb) => { ipcRenderer.on('mobile:notification',  (_e, d) => cb(d)); return () => ipcRenderer.removeAllListeners('mobile:notification') },
   },
 
   // Clipboard

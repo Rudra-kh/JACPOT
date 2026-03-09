@@ -11,6 +11,8 @@ const fs = require('fs')
 
 const isDev = process.env.NODE_ENV === 'development'
 
+const mobileServer = require('./modules/mobileServer')
+
 // ──────────────────────────────────────────
 // Store module (handles encryption at rest)
 // ──────────────────────────────────────────
@@ -146,6 +148,7 @@ app.whenReady().then(async () => {
   await startSystemMetricsPolling()
   startClipboardMonitor()
   startNetworkMonitor()
+  mobileServer.startMobileServer(mainWindow)
 
   app.on('activate', () => { if (!mainWindow) createMainWindow() })
 })
@@ -387,6 +390,7 @@ function stopAllPolling() {
   if (clipInterval) clearInterval(clipInterval)
   if (netInterval) clearInterval(netInterval)
   if (mpSpotifyInterval) clearInterval(mpSpotifyInterval)
+  mobileServer.stopMobileServer()
 }
 
 // ──────────────────────────────────────────
@@ -561,49 +565,45 @@ ipcMain.handle('sms:mark-read', (_, threadId) => {
   const db = getDB(); if (!db) return
   db.prepare("UPDATE sms_cache SET read=1 WHERE thread_id=?").run(threadId)
 })
-ipcMain.handle('sms:send', async (_, { number, message, deviceId }) => {
-  return new Promise((resolve) => {
-    exec(`kdeconnect-cli --send-sms "${message}" --destination "${number}" --device "${deviceId}"`, (err) => {
-      resolve({ ok: !err, error: err?.message })
-    })
-  })
+ipcMain.handle('sms:send', async (_, { number, message }) => {
+  const sent = mobileServer.sendToPhone({ type: 'send_sms', to: number, message })
+  return { ok: sent, error: sent ? null : 'Phone not connected' }
 })
 
-// KDE Connect
-ipcMain.handle('mobile:get-status', async (_, deviceId) => {
-  return new Promise((resolve) => {
-    exec('kdeconnect-cli -l --id-only', (err, stdout) => {
-      if (err) return resolve({ connected: false, error: err.message })
-      const ids = stdout.trim().split('\n').filter(Boolean)
-      if (!ids.length) return resolve({ connected: false })
-      const id = deviceId || ids[0]
-      exec(`kdeconnect-cli -d "${id}" --follow-property battery`, (e, out) => {
-        const battMatch = out?.match(/(\d+)%/)
-        const batt = battMatch ? parseInt(battMatch[1]) : null
-        resolve({ connected: true, deviceId: id, battery: batt })
-      })
-    })
-  })
+// ── Mobile Bridge (standalone server — no KDE Connect needed) ────────────────
+ipcMain.handle('mobile:get-status', () => ({
+  connected: mobileServer.isPhoneConnected(),
+}))
+
+ipcMain.handle('mobile:ring', () => {
+  const sent = mobileServer.sendToPhone({ type: 'ring' })
+  return { ok: sent }
 })
-ipcMain.handle('mobile:ring', (_, deviceId) => {
-  exec(`kdeconnect-cli -d "${deviceId}" --ring`)
+
+ipcMain.handle('mobile:send-file', async (_, { filePath: srcPath }) => {
+  const filename = path.basename(srcPath)
+  const destPath = path.join(mobileServer.uploadDir, filename)
+  if (srcPath !== destPath) fs.copyFileSync(srcPath, destPath)
+  const url = `http://${mobileServer.getLocalIP()}:${mobileServer.PORT}/file/${encodeURIComponent(filename)}`
+  mobileServer.sendToPhone({ type: 'download_file', url, filename })
   return { ok: true }
 })
-ipcMain.handle('mobile:send-file', async (_, { deviceId, filePath }) => {
-  return new Promise((resolve) => {
-    exec(`kdeconnect-cli --share "${filePath}" --device "${deviceId}"`, (err) => {
-      resolve({ ok: !err, error: err?.message })
-    })
-  })
-})
+
 ipcMain.handle('mobile:list-devices', () => {
-  return new Promise((resolve) => {
-    exec('kdeconnect-cli -l', (err, stdout) => {
-      if (err) return resolve([])
-      const lines = stdout.split('\n').filter(l => l.includes(':'))
-      resolve(lines.map(l => ({ raw: l.trim() })))
-    })
-  })
+  if (!mobileServer.isPhoneConnected()) return []
+  return [{ name: 'Phone', connected: true }]
+})
+
+ipcMain.handle('mobile:get-qr', () => mobileServer.generateQR())
+
+ipcMain.handle('mobile:get-server-info', () => ({
+  ip: mobileServer.getLocalIP(),
+  port: mobileServer.PORT,
+}))
+
+ipcMain.handle('mobile:send-command', (_, cmd) => {
+  const sent = mobileServer.sendToPhone(cmd)
+  return { ok: sent }
 })
 
 // Transfers
@@ -659,24 +659,13 @@ ipcMain.handle('spotify:open-auth', (_, url) => {
   shell.openExternal(url)
 })
 
-// Camera
-ipcMain.handle('camera:get-url', async (_, deviceId) => {
-  // IP Webcam default port 8080; phone IP from KDE Connect or stored
-  const s = await getStore()
-  const phoneIp = s.get('mobile.phoneIp')
-  if (!phoneIp) return null
-  return `http://${phoneIp}:8080/video`
+// Camera — MJPEG relay via mobile server (phone streams frames → server → renderer)
+ipcMain.handle('camera:get-url', () => {
+  return `http://localhost:${mobileServer.PORT}/camera/stream`
 })
-ipcMain.handle('camera:torch', async (_, { on }) => {
-  const s = await getStore()
-  const phoneIp = s.get('mobile.phoneIp')
-  if (!phoneIp) return { ok: false }
-  const endpoint = on ? 'enabletorch' : 'disabletorch'
-  // Fire and forget
-  require('https') // ensure module is loaded
-  const http = require('http')
-  http.get(`http://${phoneIp}:8080/${endpoint}`, () => {}).on('error', () => {})
-  return { ok: true }
+ipcMain.handle('camera:torch', (_, { on }) => {
+  const sent = mobileServer.sendToPhone({ type: 'torch', on })
+  return { ok: sent }
 })
 
 // Auto-launch

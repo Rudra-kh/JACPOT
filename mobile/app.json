@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "JACPOTE",
+    "slug": "jacpote-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#020c18"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.jacpote.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#020c18"
+      },
+      "package": "com.jacpote.mobile",
+      "permissions": [
+        "CAMERA",
+        "READ_SMS",
+        "RECEIVE_SMS",
+        "SEND_SMS",
+        "READ_CONTACTS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "VIBRATE",
+        "WAKE_LOCK"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        { "cameraPermission": "JACPOTE needs camera access to stream video to your laptop." }
+      ],
+      [
+        "expo-barcode-scanner",
+        { "cameraPermission": "JACPOTE needs camera access to scan the pairing QR code." }
+      ],
+      "expo-battery",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": { "projectId": "YOUR_EAS_PROJECT_ID" }
+    }
+  }
+}

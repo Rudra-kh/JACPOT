@@ -33,14 +33,18 @@
     "clsx": "^2.1.1",
     "dbus-next": "^0.10.2",
     "electron-store": "^11.0.2",
+    "express": "^5.2.1",
     "framer-motion": "^12.34.5",
     "lucide-react": "^0.576.0",
+    "multer": "^2.1.1",
     "node-vibrant": "^3.1.6",
+    "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.7.0",
     "systeminformation": "^5.31.1",
+    "ws": "^8.19.0",
     "zustand": "^5.0.11"
   },
   "build": {
